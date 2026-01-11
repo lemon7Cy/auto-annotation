@@ -152,6 +152,12 @@ auto-annotation/
 
 MIT License
 
+## 🙏 鸣谢
+
+- [ddddocr](https://github.com/sml2h3/ddddocr) - 感谢 [@sml2h3](https://github.com/sml2h3) 提供的 OCR 识别库
+- [ultralytics/yolov5](https://github.com/ultralytics/yolov5) - YOLO 目标检测框架
+
 ## 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request！
+
