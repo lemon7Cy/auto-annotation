@@ -204,6 +204,11 @@ class SingleImageWidget(QWidget):
         nav_layout.addWidget(self.next_btn)
         img_layout.addLayout(nav_layout)
         
+        # 标注进度
+        self.progress_label = QLabel("进度: 0/0 (0%)")
+        self.progress_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2196F3; padding: 5px;")
+        img_layout.addWidget(self.progress_label)
+        
         right_layout.addWidget(img_group)
         
         # 类别统计
@@ -262,6 +267,9 @@ class SingleImageWidget(QWidget):
         
         # 加载进度
         self._load_progress()
+        
+        # 更新进度显示
+        self._update_progress()
         
         # 跳到第一个未完成的
         for i in range(len(self.image_files)):
@@ -495,6 +503,7 @@ class SingleImageWidget(QWidget):
                 item.setText(f"✓ {os.path.basename(self.image_files[self.current_idx])}")
             # 自动保存进度
             self._save_progress()
+            self._update_progress()
             self._next_image()
     
     def _save_to_class(self, upper_img: np.ndarray, lower_img: np.ndarray, class_name: str):
@@ -523,6 +532,16 @@ class SingleImageWidget(QWidget):
         self.stats_list.clear()
         for name, count in sorted(self.class_counts.items()):
             self.stats_list.addItem(f"{name}: {count} 张")
+    
+    def _update_progress(self):
+        """更新标注进度"""
+        total = len(self.image_files)
+        completed = len(self.completed_images)
+        if total > 0:
+            percent = completed * 100 // total
+            self.progress_label.setText(f"进度: {completed}/{total} ({percent}%)")
+        else:
+            self.progress_label.setText("进度: 0/0 (0%)")
     
     def _prev_image(self):
         if self.current_idx > 0:

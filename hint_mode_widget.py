@@ -12,10 +12,22 @@ from typing import List, Dict, Optional
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QGroupBox,
     QListWidget, QPushButton, QLabel, QFileDialog,
-    QMessageBox, QScrollArea, QFrame, QInputDialog
+    QMessageBox, QScrollArea, QFrame, QInputDialog,
+    QCheckBox
 )
 from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtCore import Qt, pyqtSignal
+
+try:
+    import ddddocr
+except ImportError:
+    ddddocr = None
+
+try:
+    import onnxruntime
+    ONNX_AVAILABLE = True
+except ImportError:
+    ONNX_AVAILABLE = False
 
 
 def cv_imread(filepath: str):
@@ -86,6 +98,13 @@ class HintModeWidget(QWidget):
         # 已完成的图片索引
         self.completed_images: set = set()
         
+        # OCR 实例
+        self.ocr = None
+        
+        # 自定义 OCR ONNX 模型
+        self.ocr_onnx_session = None
+        self.ocr_label_map: List[str] = []
+        
         self._init_ui()
     
     def _init_ui(self):
@@ -112,6 +131,23 @@ class HintModeWidget(QWidget):
         hint_label = QLabel("📌 文件名格式：类别1_类别2_类别3_xxx.jpg → 自动解析为可选类别")
         hint_label.setStyleSheet("color: #666; padding: 5px; background: #f5f5f5; border-radius: 3px;")
         layout.addWidget(hint_label)
+        
+        # OCR 选项
+        ocr_layout = QHBoxLayout()
+        self.ocr_check = QCheckBox("启用 OCR 辅助")
+        if ddddocr is None and not ONNX_AVAILABLE:
+            self.ocr_check.setEnabled(False)
+            self.ocr_check.setText("启用 OCR 辅助 (未安装依赖)")
+        ocr_layout.addWidget(self.ocr_check)
+        
+        self.load_ocr_model_btn = QPushButton("加载 OCR 模型")
+        self.load_ocr_model_btn.clicked.connect(self._load_ocr_model)
+        ocr_layout.addWidget(self.load_ocr_model_btn)
+        
+        self.ocr_model_label = QLabel("未加载 (使用 ddddocr)")
+        ocr_layout.addWidget(self.ocr_model_label)
+        ocr_layout.addStretch()
+        layout.addLayout(ocr_layout)
         
         # 主内容区
         splitter = QSplitter(Qt.Horizontal)
@@ -174,6 +210,11 @@ class HintModeWidget(QWidget):
         nav_layout.addWidget(self.next_btn)
         img_layout.addLayout(nav_layout)
         
+        # 标注进度
+        self.progress_label = QLabel("进度: 0/0 (0%)")
+        self.progress_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2196F3; padding: 5px;")
+        img_layout.addWidget(self.progress_label)
+        
         right_layout.addWidget(img_group)
         
         # 类别统计
@@ -197,6 +238,10 @@ class HintModeWidget(QWidget):
         
         right_layout.addLayout(btn_layout)
         
+        # 语序标注选项
+        self.word_order_check = QCheckBox("启用语序标注 (记录点击顺序保存为词语)")
+        right_layout.addWidget(self.word_order_check)
+        
         splitter.addWidget(right_widget)
         splitter.setSizes([700, 250])
     
@@ -215,7 +260,87 @@ class HintModeWidget(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "错误", f"加载模型失败: {e}")
     
+    def _load_ocr_model(self):
+        """加载自定义 OCR ONNX 模型"""
+        if not ONNX_AVAILABLE:
+            QMessageBox.warning(self, "警告", "未安装 onnxruntime，无法加载自定义模型")
+            return
+        
+        model_path, _ = QFileDialog.getOpenFileName(
+            self, "选择 OCR ONNX 模型", "", "ONNX模型 (*.onnx)"
+        )
+        if not model_path:
+            return
+        
+        # 查找同目录下的 class.json
+        model_dir = os.path.dirname(model_path)
+        class_json_path = os.path.join(model_dir, "class.json")
+        
+        if not os.path.exists(class_json_path):
+            QMessageBox.critical(self, "错误", f"未找到 class.json\n请将 class.json 放在模型同目录下:\n{model_dir}")
+            return
+        
+        try:
+            # 加载类别映射
+            with open(class_json_path, 'r', encoding='utf-8') as f:
+                self.ocr_label_map = json.load(f)
+            
+            # 加载 ONNX 模型
+            providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+            self.ocr_onnx_session = onnxruntime.InferenceSession(model_path, providers=providers)
+            
+            self.ocr_model_label.setText(f"已加载: {os.path.basename(model_path)} ({len(self.ocr_label_map)} 类别)")
+            QMessageBox.information(self, "成功", f"OCR 模型加载成功\n类别数: {len(self.ocr_label_map)}")
+            
+        except Exception as e:
+            self.ocr_onnx_session = None
+            self.ocr_label_map = []
+            QMessageBox.critical(self, "错误", f"加载 OCR 模型失败: {e}")
+    
+    def _ocr_predict(self, crop_img: np.ndarray) -> str:
+        """使用自定义 ONNX 模型进行 OCR 推理 (NumPy 实现，无需 torch)"""
+        if self.ocr_onnx_session is None or not self.ocr_label_map:
+            return ""
+        
+        try:
+            # 1. Resize to 128x128
+            img = cv2.resize(crop_img, (128, 128))
+            
+            # 2. BGR -> RGB
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            
+            # 3. Normalize & Transpose
+            # PyTorch Normalize: (image - mean) / std
+            # mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+            img = img.astype(np.float32) / 255.0
+            mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+            std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+            img = (img - mean) / std
+            
+            # (H, W, C) -> (C, H, W)
+            img = img.transpose(2, 0, 1)
+            
+            # Add batch dimension: (1, C, H, W)
+            img_tensor = np.expand_dims(img, axis=0)
+            
+            # 推理
+            input_name = self.ocr_onnx_session.get_inputs()[0].name
+            outputs = self.ocr_onnx_session.run(None, {input_name: img_tensor})
+            output = outputs[0]
+            
+            # 获取预测类别
+            predicted_idx = np.argmax(output, axis=1)[0]
+            
+            if predicted_idx < len(self.ocr_label_map):
+                return self.ocr_label_map[predicted_idx]
+            else:
+                return ""
+        except Exception as e:
+            print(f"OCR 推理失败: {e}")
+            return ""
+
     def _load_data_folder(self):
+
         """加载图片文件夹"""
         folder = QFileDialog.getExistingDirectory(self, "选择图片文件夹")
         if not folder:
@@ -242,6 +367,9 @@ class HintModeWidget(QWidget):
         
         # 加载进度
         self._load_progress()
+        
+        # 更新进度显示
+        self._update_progress()
         
         # 跳到第一个未完成的
         for i in range(len(self.image_files)):
@@ -311,6 +439,9 @@ class HintModeWidget(QWidget):
         
         img_path = self.image_files[self.current_idx]
         self.current_image = cv_imread(img_path)
+        
+        # 重置当前语序序列
+        self.current_word_sequence = []
         
         if self.current_image is None:
             return
@@ -412,16 +543,45 @@ class HintModeWidget(QWidget):
                 editable=True  # 允许手动输入
             )
         else:
+            # 没有选项时，检查是否开启 OCR
+            default_text = "class_1"
+            
+            if self.ocr_check.isChecked():
+                # 优先使用自定义 ONNX 模型
+                if self.ocr_onnx_session is not None:
+                    res = self._ocr_predict(crop_img)
+                    if res:
+                        default_text = res
+                # 否则使用 ddddocr
+                elif ddddocr:
+                    if self.ocr is None:
+                        self.ocr = ddddocr.DdddOcr(show_ad=False)
+                    
+                    try:
+                        # 转换图片格式用于 OCR
+                        rgb = cv2.cvtColor(crop_img, cv2.COLOR_BGR2RGB)
+                        _, buf = cv2.imencode('.png', rgb)
+                        bytes_img = buf.tobytes()
+                        res = self.ocr.classification(bytes_img)
+                        if res:
+                            default_text = res
+                    except Exception as e:
+                        print(f"OCR 识别失败: {e}")
+            
             class_name, ok = QInputDialog.getText(
                 self, "输入类别名",
                 "请输入该目标的类别名:",
-                text="class_1"
+                text=default_text
             )
         
         if not ok or not class_name.strip():
             return
         
         class_name = class_name.strip()
+        
+        # 记录语序
+        if self.word_order_check.isChecked():
+            self.current_word_sequence.append(class_name)
         
         # 保存
         self._save_crop(crop_img, class_name)
@@ -434,11 +594,13 @@ class HintModeWidget(QWidget):
         
         # 如果都分类完了，下一张
         if not self.detected_crops:
+            self._save_word_order()
             self.completed_images.add(self.current_idx)
             item = self.image_list.item(self.current_idx)
             if item:
                 item.setText(f"✓ {os.path.basename(self.image_files[self.current_idx])}")
             self._save_progress()
+            self._update_progress()
             self._next_image()
     
     def _save_crop(self, crop_img: np.ndarray, class_name: str):
@@ -461,10 +623,54 @@ class HintModeWidget(QWidget):
         for name, count in sorted(self.class_counts.items()):
             self.stats_list.addItem(f"{name}: {count} 张")
     
+    def _update_progress(self):
+        """更新标注进度"""
+        total = len(self.image_files)
+        completed = len(self.completed_images)
+        if total > 0:
+            percent = completed * 100 // total
+            self.progress_label.setText(f"进度: {completed}/{total} ({percent}%)")
+        else:
+            self.progress_label.setText("进度: 0/0 (0%)")
+
+    
+    def _save_word_order(self):
+        """保存语序词语"""
+        if not self.word_order_check.isChecked() or not self.current_word_sequence:
+            return
+            
+        word = "".join(self.current_word_sequence)
+        if not word:
+            return
+            
+        idioms_file = os.path.join(self.data_folder, "idioms.txt")
+        
+        # 读取现有词语以去重
+        existing_words = set()
+        if os.path.exists(idioms_file):
+            try:
+                with open(idioms_file, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        existing_words.add(line.strip())
+            except Exception as e:
+                print(f"读取词语文件失败: {e}")
+        
+        # 如果是新词语，追加保存
+        if word not in existing_words:
+            try:
+                with open(idioms_file, 'a', encoding='utf-8') as f:
+                    f.write(word + "\n")
+                print(f"已保存新词语: {word}")
+            except Exception as e:
+                print(f"保存词语失败: {e}")
+
     def _manual_complete(self):
         """手动完成当前图片，跳过剩余目标"""
         if self.current_idx < 0:
             return
+        
+        # 保存语序（如果有）
+        self._save_word_order()
         
         # 标记为已完成
         self.completed_images.add(self.current_idx)
@@ -474,6 +680,9 @@ class HintModeWidget(QWidget):
         
         # 保存进度
         self._save_progress()
+        
+        # 更新进度显示
+        self._update_progress()
         
         # 下一张
         self._next_image()

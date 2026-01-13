@@ -205,6 +205,11 @@ class SiameseFolderWidget(QWidget):
         nav_layout.addWidget(self.next_btn)
         sample_layout.addLayout(nav_layout)
         
+        # 标注进度
+        self.progress_label = QLabel("进度: 0/0 (0%)")
+        self.progress_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2196F3; padding: 5px;")
+        sample_layout.addWidget(self.progress_label)
+        
         right_layout.addWidget(sample_group)
         
         stats_group = QGroupBox("类别统计")
@@ -297,6 +302,9 @@ class SiameseFolderWidget(QWidget):
         
         # 尝试加载进度
         self._load_progress()
+        
+        # 更新进度显示
+        self._update_progress()
         
         # 跳到第一个未完成的样本
         for i in range(len(self.samples)):
@@ -509,6 +517,7 @@ class SiameseFolderWidget(QWidget):
                 item.setText(f"✓ {self.samples[self.current_sample_idx]['name']}")
             # 自动保存进度
             self._save_progress()
+            self._update_progress()
             self._next_sample()
     
     def _save_crop(self, crop_img, class_name, hint_path):
@@ -533,6 +542,16 @@ class SiameseFolderWidget(QWidget):
         self.stats_list.clear()
         for name, count in sorted(self.class_counts.items()):
             self.stats_list.addItem(f"{name}: {count} 张")
+    
+    def _update_progress(self):
+        """更新标注进度"""
+        total = len(self.sample_folders)
+        completed = len(self.completed_samples)
+        if total > 0:
+            percent = completed * 100 // total
+            self.progress_label.setText(f"进度: {completed}/{total} ({percent}%)")
+        else:
+            self.progress_label.setText("进度: 0/0 (0%)")
     
     def _prev_sample(self):
         if self.current_sample_idx > 0:
