@@ -68,3 +68,5 @@ datasets/
 all_images/
 labeled_images/
 labels/
+model/
+pharse/
