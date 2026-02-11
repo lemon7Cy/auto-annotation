@@ -233,7 +233,7 @@ class SiameseFolderWidget(QWidget):
             return
         
         try:
-            from yolo_detector import YOLODetector
+            from ...core.yolo_detector import YOLODetector
             self.detector = YOLODetector(model_path)
             self.model_label.setText(f"模型: {os.path.basename(model_path)}")
         except Exception as e:

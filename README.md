@@ -127,7 +127,7 @@ python main.py
 ## 🔧 配置
 
 ### 检测阈值
-在 `yolo_detector.py` 中修改：
+在 `app/core/yolo_detector.py` 中修改：
 ```python
 self.conf_threshold = 0.25
 self.iou_threshold = 0.45
@@ -137,15 +137,21 @@ self.iou_threshold = 0.45
 
 ```
 auto-annotation/
-├── main.py                    # 入口
-├── main_window.py             # 主窗口
-├── image_canvas.py            # 标注画布
-├── yolo_detector.py           # YOLO 推理
-├── siamese_widget.py          # 孪生分类容器
-├── siamese_folder_widget.py   # 模式 1/3
-├── single_image_widget.py     # 模式 2
-├── hint_mode_widget.py        # 模式 4
-└── project_manager.py         # 项目管理
+├── main.py                            # 入口
+├── app/
+│   ├── core/
+│   │   ├── annotation_utils.py        # 标注读写工具
+│   │   ├── project_manager.py         # 项目管理
+│   │   └── yolo_detector.py           # YOLO 推理
+│   └── ui/
+│       ├── main_window.py             # 主窗口
+│       ├── image_canvas.py            # 标注画布
+│       ├── siamese_widget.py          # 孪生分类容器
+│       └── siamese/
+│           ├── siamese_folder_widget.py # 模式 1/3
+│           ├── single_image_widget.py   # 模式 2
+│           └── hint_mode_widget.py      # 模式 4
+└── requirements.txt
 ```
 
 ## 📄 License
@@ -160,4 +166,3 @@ MIT License
 ## 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request！
-

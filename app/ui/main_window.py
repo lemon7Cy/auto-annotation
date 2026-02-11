@@ -18,10 +18,10 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon, QKeySequence
 from PyQt5.QtCore import Qt, QSize
 
-from image_canvas import ImageCanvas
-from annotation_utils import save_annotations, load_annotations, get_label_path
-from project_manager import Project, RecentProjectsManager
-from siamese_widget import SiameseWidget
+from .image_canvas import ImageCanvas
+from ..core.annotation_utils import save_annotations, load_annotations, get_label_path
+from ..core.project_manager import Project, RecentProjectsManager
+from .siamese_widget import SiameseWidget
 
 
 def cv_imread(filepath: str):
@@ -605,7 +605,7 @@ class MainWindow(QMainWindow):
         
         try:
             # Lazy import to avoid startup errors
-            from yolo_detector import YOLODetector
+            from ..core.yolo_detector import YOLODetector
             
             class_names = self.project.classes if self.project else ['object']
             

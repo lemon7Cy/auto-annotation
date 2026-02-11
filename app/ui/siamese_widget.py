@@ -8,9 +8,9 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTabWidget
 
 # 导入各模式的组件
-from siamese_folder_widget import SiameseFolderWidget
-from single_image_widget import SingleImageWidget
-from hint_mode_widget import HintModeWidget
+from .siamese.siamese_folder_widget import SiameseFolderWidget
+from .siamese.single_image_widget import SingleImageWidget
+from .siamese.hint_mode_widget import HintModeWidget
 
 
 class SiameseWidget(QWidget):
