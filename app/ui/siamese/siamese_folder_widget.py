@@ -13,7 +13,7 @@ from typing import List, Dict, Optional
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QGroupBox,
     QListWidget, QPushButton, QLabel, QFileDialog,
-    QMessageBox, QScrollArea, QFrame, QCheckBox, QInputDialog
+    QMessageBox, QScrollArea, QFrame, QCheckBox, QInputDialog, QDoubleSpinBox
 )
 from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtCore import Qt, pyqtSignal
@@ -138,6 +138,16 @@ class SiameseFolderWidget(QWidget):
         self.model_label = QLabel("未加载模型")
         toolbar.addWidget(self.model_label)
         
+        # 置信度调节
+        toolbar.addWidget(QLabel("置信度:"))
+        self.conf_spinbox = QDoubleSpinBox()
+        self.conf_spinbox.setRange(0.1, 0.9)
+        self.conf_spinbox.setSingleStep(0.05)
+        self.conf_spinbox.setValue(0.25)
+        self.conf_spinbox.setToolTip("YOLO检测置信度阈值，越低检测越多")
+        self.conf_spinbox.valueChanged.connect(self._on_conf_changed)
+        toolbar.addWidget(self.conf_spinbox)
+        
         toolbar.addStretch()
         layout.addLayout(toolbar)
         
@@ -233,11 +243,17 @@ class SiameseFolderWidget(QWidget):
             return
         
         try:
-            from ...core.yolo_detector import YOLODetector
-            self.detector = YOLODetector(model_path)
+            from yolo_detector import YOLODetector
+            self.detector = YOLODetector(model_path, conf_thres=self.conf_spinbox.value())
             self.model_label.setText(f"模型: {os.path.basename(model_path)}")
         except Exception as e:
             QMessageBox.critical(self, "错误", f"加载模型失败: {e}")
+    
+    def _on_conf_changed(self, value):
+        """置信度变化时更新检测器"""
+        if self.detector:
+            self.detector.set_thresholds(conf_thres=value)
+
     
     def _load_data_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "选择数据文件夹")

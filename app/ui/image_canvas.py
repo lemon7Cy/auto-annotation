@@ -68,6 +68,9 @@ class ImageCanvas(QWidget):
         self.scale = 1.0
         self.offset_x = 0
         self.offset_y = 0
+        self.user_scale = 1.0  # 用户手动缩放倍数
+        self.min_scale = 0.1   # 最小缩放
+        self.max_scale = 10.0  # 最大缩放
         
         # 交互状态
         self.mode = self.MODE_DRAW  # 默认绘制模式
@@ -107,6 +110,9 @@ class ImageCanvas(QWidget):
         bytes_per_line = ch * w
         qimg = QImage(rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
         self.pixmap = QPixmap.fromImage(qimg)
+        
+        # 不重置用户缩放，保持当前缩放状态
+        # self.user_scale = 1.0  # 注释掉这行，保持缩放
         
         # 计算缩放和偏移以居中显示
         self._update_transform()
@@ -171,7 +177,10 @@ class ImageCanvas(QWidget):
         # 计算适应窗口的缩放比例
         w_scale = self.width() / self.img_w
         h_scale = self.height() / self.img_h
-        self.scale = min(w_scale, h_scale, 1.0)  # 不放大，只缩小
+        base_scale = min(w_scale, h_scale, 1.0)  # 不放大，只缩小
+        
+        # 应用用户缩放
+        self.scale = base_scale * self.user_scale
         
         # 计算居中偏移
         scaled_w = self.img_w * self.scale
@@ -473,12 +482,55 @@ class ImageCanvas(QWidget):
     
     def keyPressEvent(self, event):
         """键盘事件"""
+        # Ctrl + 上下箭头缩放
+        if event.modifiers() == Qt.ControlModifier:
+            if event.key() == Qt.Key_Up:
+                self._zoom_in()
+                return
+            elif event.key() == Qt.Key_Down:
+                self._zoom_out()
+                return
+            elif event.key() == Qt.Key_0:
+                # Ctrl + 0 重置缩放
+                self._reset_zoom()
+                return
+        
         if event.key() == Qt.Key_Delete or event.key() == Qt.Key_Backspace:
             self.delete_selected()
         elif event.key() == Qt.Key_Escape:
             self.selected_idx = -1
             self.drawing = False
             self.update()
+    
+    def wheelEvent(self, event):
+        """鼠标滚轮事件 - Ctrl+滚轮缩放"""
+        if event.modifiers() == Qt.ControlModifier:
+            delta = event.angleDelta().y()
+            if delta > 0:
+                self._zoom_in()
+            else:
+                self._zoom_out()
+            event.accept()
+        else:
+            event.ignore()
+    
+    def _zoom_in(self):
+        """放大"""
+        self.user_scale = min(self.user_scale * 1.1, self.max_scale)
+        self._update_transform()
+        self.update()
+    
+    def _zoom_out(self):
+        """缩小"""
+        self.user_scale = max(self.user_scale / 1.1, self.min_scale)
+        self._update_transform()
+        self.update()
+    
+    def _reset_zoom(self):
+        """重置缩放到1.0"""
+        self.user_scale = 1.0
+        self._update_transform()
+        self.update()
     
     def resizeEvent(self, event):
         """窗口大小改变事件"""
