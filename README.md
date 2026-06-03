@@ -1,21 +1,31 @@
+<div align="center">
+
 # Auto Annotation
 
-![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
-![PyQt5](https://img.shields.io/badge/PyQt5-5.15+-green.svg)
-![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+**YOLOv5 半自动标注工具 + 孪生分类数据集制作工具**
 
-YOLOv5 半自动标注工具 + 孪生分类数据集制作工具
+![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB?logo=python&logoColor=white)
+![PyQt5](https://img.shields.io/badge/PyQt5-desktop%20GUI-41CD52?logo=qt&logoColor=white)
+![ONNX](https://img.shields.io/badge/ONNX-runtime-005CED?logo=onnx&logoColor=white)
+![OpenCV](https://img.shields.io/badge/OpenCV-annotation-5C3EE8?logo=opencv&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-F59E0B)
 
-## ✨ 功能特性
+</div>
 
-### 🎯 YOLO 标注模式
+## 项目简介
+
+Auto Annotation 是一个面向目标检测标注和孪生分类数据集制作的桌面工具，适合在已有 YOLO/ONNX 模型辅助下快速完成预标注、框编辑、类别匹配和样本裁剪。
+
+## 功能特性
+
+### YOLO 标注模式
 - 支持 ONNX 模型推理预标注
 - 可视化边界框编辑
 - 点击放置固定尺寸框（支持类别尺寸记忆）
 - 自动切换下一张，提高标注效率
 - 支持中文路径
 
-### 🔗 孪生分类模式
+### 孪生分类模式
 用于制作孪生网络（Siamese Network）分类训练数据集，支持四种工作模式：
 
 | 模式 | 名称 | 说明 |
@@ -24,11 +34,11 @@ YOLOv5 半自动标注工具 + 孪生分类数据集制作工具
 | 2 | 单图式 | 一张图包含上方目标 + 下方提示 |
 | 4 | 提示词式 | 仅背景图，从文件名解析类别 |
 
-## 📦 安装
+## 安装
 
 ```bash
 # 克隆仓库
-git clone https://github.com/YOUR_USERNAME/auto-annotation.git
+git clone https://github.com/lemon7Cy/auto-annotation.git
 cd auto-annotation
 
 # 安装依赖
@@ -44,13 +54,13 @@ onnxruntime>=1.10
 ddddocr>=1.4  # 可选，用于OCR模式
 ```
 
-## 🚀 快速开始
+## 快速开始
 
 ```bash
 python main.py
 ```
 
-## 📖 使用指南
+## 使用指南
 
 ### YOLO 标注模式
 
@@ -124,7 +134,7 @@ python main.py
 3. 点击检测目标 → 从下拉菜单选择类别
 4. 点击「完成当前图片」跳过剩余目标
 
-## 🔧 配置
+## 配置
 
 ### 检测阈值
 在 `app/core/yolo_detector.py` 中修改：
@@ -133,7 +143,7 @@ self.conf_threshold = 0.25
 self.iou_threshold = 0.45
 ```
 
-## 📁 项目结构
+## 项目结构
 
 ```
 auto-annotation/
@@ -154,15 +164,15 @@ auto-annotation/
 └── requirements.txt
 ```
 
-## 📄 License
+## License
 
 MIT License
 
-## 🙏 鸣谢
+## 鸣谢
 
 - [ddddocr](https://github.com/sml2h3/ddddocr) - 感谢 [@sml2h3](https://github.com/sml2h3) 提供的 OCR 识别库
 - [ultralytics/yolov5](https://github.com/ultralytics/yolov5) - YOLO 目标检测框架
 
-## 🤝 贡献
+## 贡献
 
 欢迎提交 Issue 和 Pull Request！
